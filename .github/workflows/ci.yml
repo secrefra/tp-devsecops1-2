@@ -1,29 +1,61 @@
+# Nom du pipeline, affiché dans l'onglet Actions de GitHub
 name: CI/CD - democyber
-# Trigger the workflow on push or pull request to main
+
+# QUAND le pipeline se lance : à chaque push ou pull request sur la branche main
 on:
-push:
-branches: [ main ]
-pull_request:
-branches: [ main ]
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+# CE QUE fait le pipeline : une liste de "jobs"
 jobs:
-build-and-deploy:
-runs-on: ubuntu-latest
-env:
-DOCKER_IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME1 }}/democyber:latest
-steps:
-# Checkout the code
-- name: Checkout repository
-uses: actions/checkout@v3
-# Install Java
-- name: Set up JDK 21
-uses: actions/setup-java@v3
-with:
-java-version: '21'
-distribution: 'temurin'
+  # Le nom du job (choisi librement)
+  build-and-deploy:
+    # La machine qui exécute le job : un serveur Ubuntu neuf, fourni par GitHub, effacé après le run
+    runs-on: ubuntu-latest
 
-# Compile Java code
-- name: Compile Java
-run: mvn compile
-# Build Maven
+    # Variable réutilisée plus bas : le nom complet de l'image
+    # Elle devient rahmasecref/democyber:latest (le nom d'utilisateur vient du secret)
+    env:
+      DOCKER_IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME1 }}/democyber:latest
 
-run: mvn clean package
+    # Les étapes, exécutées dans l'ordre. Si une étape échoue, les suivantes ne s'exécutent pas
+    steps:
+      # 1. Copier le code du dépôt sur la machine Ubuntu (au départ, elle est vide)
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      # 2. Installer Java 21 sur la machine
+      #    cache: maven garde les dépendances téléchargées pour accélérer les prochains runs
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      # 3. Compiler le code Java : vérifie qu'il n'y a pas d'erreur de compilation
+      #    -B = mode "batch" (non interactif), des logs plus propres en CI
+      - name: Compile Java
+        run: mvn -B compile
+
+      # 4. Construire le jar dans target/ (le Dockerfile en a besoin)
+      - name: Build Java project with Maven
+        run: mvn -B clean package
+
+      # 5. Se connecter à Docker Hub avec les secrets GitHub (jamais écrits en clair)
+      - name: Login to Docker Hub
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME1 }}
+          password: ${{ secrets.DOCKERHUB_TOKEN1 }}
+
+      # 6. Construire l'image Docker avec le Dockerfile du dépôt
+      - name: Build Docker image
+        run: docker build -t "$DOCKER_IMAGE_NAME" .
+
+      # 7. Tester l'image : lancer le conteneur, puis vérifier jusqu'à 30 fois (toutes les 2 s)
+      #    que la page contient "democyber". Sinon, afficher les logs et faire échouer le job
+      #    run: | permet d'écrire plusieurs commandes sur plusieurs lignes
+      - name: Test Docker
