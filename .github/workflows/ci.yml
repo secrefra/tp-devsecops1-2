@@ -40,3 +40,10 @@ jobs:
       # Build Maven
       - name: Build Java project with Maven
         run: mvn clean package
+        
+      - name: Upload Gitleaks report
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: gitleaks-report
+          path: results.sarif        
