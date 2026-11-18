@@ -14,9 +14,17 @@ jobs:
       DOCKER_IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME1 }}/democyber:latest
 
     steps:
-      # Checkout the code
+      # Checkout the code (fetch-depth: 0 = tout l'historique, nécessaire pour Gitleaks)
       - name: Checkout repository
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      # Gitleaks scan (before compilation)
+      - name: Run Gitleaks scan
+        uses: gitleaks/gitleaks-action@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # Install Java
       - name: Set up JDK 21
