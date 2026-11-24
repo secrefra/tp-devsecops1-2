@@ -41,6 +41,19 @@ jobs:
       - name: Build Java project with Maven
         run: mvn clean package
 
+
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarqube-scan-action@v8
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: >
+            -Dsonar.organization=${{ secrets.SONAR_ORGANIZATION }}
+            -Dsonar.projectKey=${{ secrets.SONAR_PROJECT_KEY }}
+            -Dsonar.sources=src
+            -Dsonar.java.binaries=target/classes
+
+
       - name: Upload Gitleaks report
         if: always()
         uses: actions/upload-artifact@v6
@@ -79,4 +92,3 @@ jobs:
           path: trivy-report.json  
       - name: Push Docker image
         run: docker push $DOCKER_IMAGE_NAME                  
-                  
